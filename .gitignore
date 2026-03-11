@@ -1,0 +1,32 @@
+# Environment
+.env
+.venv/
+*.pyc
+__pycache__/
+
+# OS
+.DS_Store
+
+# Build
+*.egg-info/
+dist/
+build/
+
+# Raw data (not for distribution)
+data/opta/raw/
+data/opta/etl_log.txt
+data/odds/
+data/international/
+
+# Opta API internals & internal design docs (private)
+doc/opta-api-reference.md
+doc/tikaml_league_guide.md
+doc/tikaml_worldcup_guide.md
+experiments/scripts/opta_etl.py
+experiments/src/parser.py
+experiments/src/event_features.py
+experiments/scripts/build_features.py
+
+# IDE / tools
+.kaggle/
+.claude/

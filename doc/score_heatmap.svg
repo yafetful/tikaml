@@ -1,0 +1,204 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 628 598" width="628" height="598">
+<style>
+  text { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; }
+  .title { font-size: 18px; font-weight: 600; fill: #1a1a1a; }
+  .subtitle { font-size: 13px; fill: #666; }
+  .axis-label { font-size: 13px; fill: #333; font-weight: 500; }
+  .axis-title { font-size: 14px; fill: #333; font-weight: 600; }
+  .cell-text { font-size: 11px; fill: #333; }
+  .cell-text-light { font-size: 11px; fill: #fff; }
+  .legend-text { font-size: 11px; fill: #666; }
+</style>
+<rect width="628" height="598" fill="#fafafa" rx="8"/>
+<text x="304" y="30" text-anchor="middle" class="title">Arsenal vs Chelsea</text>
+<text x="304" y="50" text-anchor="middle" class="subtitle">7×7 比分概率矩阵  |  λ_home=1.69  λ_away=1.08</text>
+<rect x="80" y="62" width="225.4" height="18" fill="#2e7d32" rx="3"/>
+<text x="192.70658025161254" y="75" text-anchor="middle" style="font-size:11px;fill:#fff;font-weight:500">主胜 50.3%</text>
+<rect x="305.4" y="62" width="119.3" height="18" fill="#f9a825"/>
+<text x="365.1" y="75" text-anchor="middle" style="font-size:11px;fill:#333;font-weight:500">平局 26.6%</text>
+<rect x="424.7" y="62" width="103.3" height="18" fill="#c62828" rx="3"/>
+<text x="476.4" y="75" text-anchor="middle" style="font-size:11px;fill:#fff;font-weight:500">客胜 23.1%</text>
+<text x="304" y="90" text-anchor="middle" class="axis-title">Chelsea 进球 (客队)</text>
+<text x="18" y="324" text-anchor="middle" class="axis-title" transform="rotate(-90 18 324)">Arsenal 进球 (主队)</text>
+<rect x="80" y="100" width="64" height="64" fill="#6e9b72" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="80" y="100" width="64" height="64" fill="none" stroke="#f9a825" stroke-width="2.5"/>
+<text x="112" y="128" text-anchor="middle" class="cell-text-light" style="font-weight:600">7.5%</text>
+<text x="112" y="144" text-anchor="middle" style="font-size:10px;fill:#ccc">0-0</text>
+<rect x="144" y="100" width="64" height="64" fill="#8eb391" stroke="#e0e0e0" stroke-width="1"/>
+<text x="176" y="128" text-anchor="middle" class="cell-text" style="font-weight:600">5.5%</text>
+<text x="176" y="144" text-anchor="middle" style="font-size:10px;fill:#999">0-1</text>
+<rect x="208" y="100" width="64" height="64" fill="#acc9af" stroke="#e0e0e0" stroke-width="1"/>
+<text x="240" y="128" text-anchor="middle" class="cell-text" style="font-weight:600">3.7%</text>
+<text x="240" y="144" text-anchor="middle" style="font-size:10px;fill:#999">0-2</text>
+<rect x="272" y="100" width="64" height="64" fill="#d2e5d4" stroke="#e0e0e0" stroke-width="1"/>
+<text x="304" y="128" text-anchor="middle" class="cell-text" style="font-weight:600">1.3%</text>
+<text x="304" y="144" text-anchor="middle" style="font-size:10px;fill:#999">0-3</text>
+<rect x="336" y="100" width="64" height="64" fill="#e2f0e3" stroke="#e0e0e0" stroke-width="1"/>
+<text x="368" y="136" text-anchor="middle" class="cell-text" style="font-size:10px">0.4%</text>
+<rect x="400" y="100" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="464" y="100" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="80" y="164" width="64" height="64" fill="#508554" stroke="#e0e0e0" stroke-width="1"/>
+<text x="112" y="192" text-anchor="middle" class="cell-text-light" style="font-weight:600">9.4%</text>
+<text x="112" y="208" text-anchor="middle" style="font-size:10px;fill:#ccc">1-0</text>
+<rect x="144" y="164" width="64" height="64" fill="#1b5e20" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="144" y="164" width="64" height="64" fill="none" stroke="#f9a825" stroke-width="2.5"/>
+<text x="176" y="192" text-anchor="middle" class="cell-text-light" style="font-weight:600">12.7%</text>
+<text x="176" y="208" text-anchor="middle" style="font-size:10px;fill:#ccc">1-1</text>
+<rect x="208" y="164" width="64" height="64" fill="#84ab87" stroke="#e0e0e0" stroke-width="1"/>
+<text x="240" y="192" text-anchor="middle" class="cell-text" style="font-weight:600">6.2%</text>
+<text x="240" y="208" text-anchor="middle" style="font-size:10px;fill:#999">1-2</text>
+<rect x="272" y="164" width="64" height="64" fill="#c4dac5" stroke="#e0e0e0" stroke-width="1"/>
+<text x="304" y="192" text-anchor="middle" class="cell-text" style="font-weight:600">2.2%</text>
+<text x="304" y="208" text-anchor="middle" style="font-size:10px;fill:#999">1-3</text>
+<rect x="336" y="164" width="64" height="64" fill="#deeddf" stroke="#e0e0e0" stroke-width="1"/>
+<text x="368" y="200" text-anchor="middle" class="cell-text" style="font-size:10px">0.6%</text>
+<rect x="400" y="164" width="64" height="64" fill="#e5f3e6" stroke="#e0e0e0" stroke-width="1"/>
+<text x="432" y="200" text-anchor="middle" class="cell-text" style="font-size:10px">0.1%</text>
+<rect x="464" y="164" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="80" y="228" width="64" height="64" fill="#578a5b" stroke="#e0e0e0" stroke-width="1"/>
+<text x="112" y="256" text-anchor="middle" class="cell-text-light" style="font-weight:600">9.0%</text>
+<text x="112" y="272" text-anchor="middle" style="font-size:10px;fill:#ccc">2-0</text>
+<rect x="144" y="228" width="64" height="64" fill="#4b814f" stroke="#e0e0e0" stroke-width="1"/>
+<text x="176" y="256" text-anchor="middle" class="cell-text-light" style="font-weight:600">9.7%</text>
+<text x="176" y="272" text-anchor="middle" style="font-size:10px;fill:#ccc">2-1</text>
+<rect x="208" y="228" width="64" height="64" fill="#93b696" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="208" y="228" width="64" height="64" fill="none" stroke="#f9a825" stroke-width="2.5"/>
+<text x="240" y="256" text-anchor="middle" class="cell-text" style="font-weight:600">5.2%</text>
+<text x="240" y="272" text-anchor="middle" style="font-size:10px;fill:#999">2-2</text>
+<rect x="272" y="228" width="64" height="64" fill="#c9decb" stroke="#e0e0e0" stroke-width="1"/>
+<text x="304" y="256" text-anchor="middle" class="cell-text" style="font-weight:600">1.9%</text>
+<text x="304" y="272" text-anchor="middle" style="font-size:10px;fill:#999">2-3</text>
+<rect x="336" y="228" width="64" height="64" fill="#dfeee0" stroke="#e0e0e0" stroke-width="1"/>
+<text x="368" y="264" text-anchor="middle" class="cell-text" style="font-size:10px">0.5%</text>
+<rect x="400" y="228" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<text x="432" y="264" text-anchor="middle" class="cell-text" style="font-size:10px">0.1%</text>
+<rect x="464" y="228" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="80" y="292" width="64" height="64" fill="#96b899" stroke="#e0e0e0" stroke-width="1"/>
+<text x="112" y="320" text-anchor="middle" class="cell-text" style="font-weight:600">5.1%</text>
+<text x="112" y="336" text-anchor="middle" style="font-size:10px;fill:#999">3-0</text>
+<rect x="144" y="292" width="64" height="64" fill="#8fb492" stroke="#e0e0e0" stroke-width="1"/>
+<text x="176" y="320" text-anchor="middle" class="cell-text" style="font-weight:600">5.5%</text>
+<text x="176" y="336" text-anchor="middle" style="font-size:10px;fill:#999">3-1</text>
+<rect x="208" y="292" width="64" height="64" fill="#b8d1ba" stroke="#e0e0e0" stroke-width="1"/>
+<text x="240" y="320" text-anchor="middle" class="cell-text" style="font-weight:600">2.9%</text>
+<text x="240" y="336" text-anchor="middle" style="font-size:10px;fill:#999">3-2</text>
+<rect x="272" y="292" width="64" height="64" fill="#d6e8d8" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="272" y="292" width="64" height="64" fill="none" stroke="#f9a825" stroke-width="2.5"/>
+<text x="304" y="320" text-anchor="middle" class="cell-text" style="font-weight:600">1.1%</text>
+<text x="304" y="336" text-anchor="middle" style="font-size:10px;fill:#999">3-3</text>
+<rect x="336" y="292" width="64" height="64" fill="#e3f1e4" stroke="#e0e0e0" stroke-width="1"/>
+<text x="368" y="328" text-anchor="middle" class="cell-text" style="font-size:10px">0.3%</text>
+<rect x="400" y="292" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="464" y="292" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="80" y="356" width="64" height="64" fill="#c5dbc7" stroke="#e0e0e0" stroke-width="1"/>
+<text x="112" y="384" text-anchor="middle" class="cell-text" style="font-weight:600">2.1%</text>
+<text x="112" y="400" text-anchor="middle" style="font-size:10px;fill:#999">4-0</text>
+<rect x="144" y="356" width="64" height="64" fill="#c2d9c4" stroke="#e0e0e0" stroke-width="1"/>
+<text x="176" y="384" text-anchor="middle" class="cell-text" style="font-weight:600">2.3%</text>
+<text x="176" y="400" text-anchor="middle" style="font-size:10px;fill:#999">4-1</text>
+<rect x="208" y="356" width="64" height="64" fill="#d3e6d5" stroke="#e0e0e0" stroke-width="1"/>
+<text x="240" y="384" text-anchor="middle" class="cell-text" style="font-weight:600">1.2%</text>
+<text x="240" y="400" text-anchor="middle" style="font-size:10px;fill:#999">4-2</text>
+<rect x="272" y="356" width="64" height="64" fill="#e0efe1" stroke="#e0e0e0" stroke-width="1"/>
+<text x="304" y="392" text-anchor="middle" class="cell-text" style="font-size:10px">0.4%</text>
+<rect x="336" y="356" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="336" y="356" width="64" height="64" fill="none" stroke="#f9a825" stroke-width="2.5"/>
+<text x="368" y="392" text-anchor="middle" class="cell-text" style="font-size:10px">0.1%</text>
+<rect x="400" y="356" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="464" y="356" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="80" y="420" width="64" height="64" fill="#dcecdd" stroke="#e0e0e0" stroke-width="1"/>
+<text x="112" y="456" text-anchor="middle" class="cell-text" style="font-size:10px">0.7%</text>
+<rect x="144" y="420" width="64" height="64" fill="#dbebdc" stroke="#e0e0e0" stroke-width="1"/>
+<text x="176" y="456" text-anchor="middle" class="cell-text" style="font-size:10px">0.8%</text>
+<rect x="208" y="420" width="64" height="64" fill="#e1efe2" stroke="#e0e0e0" stroke-width="1"/>
+<text x="240" y="456" text-anchor="middle" class="cell-text" style="font-size:10px">0.4%</text>
+<rect x="272" y="420" width="64" height="64" fill="#e5f3e6" stroke="#e0e0e0" stroke-width="1"/>
+<text x="304" y="456" text-anchor="middle" class="cell-text" style="font-size:10px">0.2%</text>
+<rect x="336" y="420" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="400" y="420" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="400" y="420" width="64" height="64" fill="none" stroke="#f9a825" stroke-width="2.5"/>
+<rect x="464" y="420" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="80" y="484" width="64" height="64" fill="#e4f2e5" stroke="#e0e0e0" stroke-width="1"/>
+<text x="112" y="520" text-anchor="middle" class="cell-text" style="font-size:10px">0.2%</text>
+<rect x="144" y="484" width="64" height="64" fill="#e4f2e5" stroke="#e0e0e0" stroke-width="1"/>
+<text x="176" y="520" text-anchor="middle" class="cell-text" style="font-size:10px">0.2%</text>
+<rect x="208" y="484" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<text x="240" y="520" text-anchor="middle" class="cell-text" style="font-size:10px">0.1%</text>
+<rect x="272" y="484" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="336" y="484" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="400" y="484" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="464" y="484" width="64" height="64" fill="#f7f7f7" stroke="#e0e0e0" stroke-width="1"/>
+<rect x="464" y="484" width="64" height="64" fill="none" stroke="#f9a825" stroke-width="2.5"/>
+<text x="68" y="137" text-anchor="middle" class="axis-label">0</text>
+<text x="112" y="82" text-anchor="middle" class="axis-label">0</text>
+<text x="68" y="201" text-anchor="middle" class="axis-label">1</text>
+<text x="176" y="82" text-anchor="middle" class="axis-label">1</text>
+<text x="68" y="265" text-anchor="middle" class="axis-label">2</text>
+<text x="240" y="82" text-anchor="middle" class="axis-label">2</text>
+<text x="68" y="329" text-anchor="middle" class="axis-label">3</text>
+<text x="304" y="82" text-anchor="middle" class="axis-label">3</text>
+<text x="68" y="393" text-anchor="middle" class="axis-label">4</text>
+<text x="368" y="82" text-anchor="middle" class="axis-label">4</text>
+<text x="68" y="457" text-anchor="middle" class="axis-label">5</text>
+<text x="432" y="82" text-anchor="middle" class="axis-label">5</text>
+<text x="68" y="521" text-anchor="middle" class="axis-label">6</text>
+<text x="496" y="82" text-anchor="middle" class="axis-label">6</text>
+<rect x="548" y="519.8" width="16" height="8.7" fill="#f7f7f7"/>
+<rect x="548" y="511.7" width="16" height="8.7" fill="#e3f1e4"/>
+<rect x="548" y="503.5" width="16" height="8.7" fill="#dfeee0"/>
+<rect x="548" y="495.4" width="16" height="8.7" fill="#dbebdc"/>
+<rect x="548" y="487.2" width="16" height="8.7" fill="#d7e8d8"/>
+<rect x="548" y="479.0" width="16" height="8.7" fill="#d3e5d4"/>
+<rect x="548" y="470.9" width="16" height="8.7" fill="#cfe2d0"/>
+<rect x="548" y="462.7" width="16" height="8.7" fill="#cbdfcc"/>
+<rect x="548" y="454.6" width="16" height="8.7" fill="#c7dcc8"/>
+<rect x="548" y="446.4" width="16" height="8.7" fill="#c3d9c4"/>
+<rect x="548" y="438.2" width="16" height="8.7" fill="#bfd6c0"/>
+<rect x="548" y="430.1" width="16" height="8.7" fill="#bad3bc"/>
+<rect x="548" y="421.9" width="16" height="8.7" fill="#b6d0b8"/>
+<rect x="548" y="413.8" width="16" height="8.7" fill="#b2cdb4"/>
+<rect x="548" y="405.6" width="16" height="8.7" fill="#aecab0"/>
+<rect x="548" y="397.4" width="16" height="8.7" fill="#aac7ac"/>
+<rect x="548" y="389.3" width="16" height="8.7" fill="#a6c4a8"/>
+<rect x="548" y="381.1" width="16" height="8.7" fill="#a2c1a4"/>
+<rect x="548" y="373.0" width="16" height="8.7" fill="#9ebea0"/>
+<rect x="548" y="364.8" width="16" height="8.7" fill="#9abb9c"/>
+<rect x="548" y="356.6" width="16" height="8.7" fill="#96b898"/>
+<rect x="548" y="348.5" width="16" height="8.7" fill="#91b594"/>
+<rect x="548" y="340.3" width="16" height="8.7" fill="#8db290"/>
+<rect x="548" y="332.2" width="16" height="8.7" fill="#89af8c"/>
+<rect x="548" y="324.0" width="16" height="8.7" fill="#85ac88"/>
+<rect x="548" y="315.8" width="16" height="8.7" fill="#81a984"/>
+<rect x="548" y="307.7" width="16" height="8.7" fill="#7da680"/>
+<rect x="548" y="299.5" width="16" height="8.7" fill="#79a37c"/>
+<rect x="548" y="291.4" width="16" height="8.7" fill="#75a078"/>
+<rect x="548" y="283.2" width="16" height="8.7" fill="#719d74"/>
+<rect x="548" y="275.0" width="16" height="8.7" fill="#6d9a70"/>
+<rect x="548" y="266.9" width="16" height="8.7" fill="#68976c"/>
+<rect x="548" y="258.7" width="16" height="8.7" fill="#649468"/>
+<rect x="548" y="250.6" width="16" height="8.7" fill="#609164"/>
+<rect x="548" y="242.4" width="16" height="8.7" fill="#5c8e60"/>
+<rect x="548" y="234.2" width="16" height="8.7" fill="#588b5c"/>
+<rect x="548" y="226.1" width="16" height="8.7" fill="#548858"/>
+<rect x="548" y="217.9" width="16" height="8.7" fill="#508554"/>
+<rect x="548" y="209.8" width="16" height="8.7" fill="#4c8250"/>
+<rect x="548" y="201.6" width="16" height="8.7" fill="#487f4c"/>
+<rect x="548" y="193.4" width="16" height="8.7" fill="#447c48"/>
+<rect x="548" y="185.3" width="16" height="8.7" fill="#3f7944"/>
+<rect x="548" y="177.1" width="16" height="8.7" fill="#3b7640"/>
+<rect x="548" y="169.0" width="16" height="8.7" fill="#37733c"/>
+<rect x="548" y="160.8" width="16" height="8.7" fill="#337038"/>
+<rect x="548" y="152.6" width="16" height="8.7" fill="#2f6d34"/>
+<rect x="548" y="144.5" width="16" height="8.7" fill="#2b6a30"/>
+<rect x="548" y="136.3" width="16" height="8.7" fill="#27672c"/>
+<rect x="548" y="128.2" width="16" height="8.7" fill="#236428"/>
+<rect x="548" y="120.0" width="16" height="8.7" fill="#1f6124"/>
+<rect x="548" y="120" width="16" height="408" fill="none" stroke="#ccc" stroke-width="1"/>
+<text x="570" y="532.0" class="legend-text">0%</text>
+<text x="570" y="435.59927753185644" class="legend-text">3%</text>
+<text x="570" y="339.1985550637129" class="legend-text">6%</text>
+<text x="570" y="242.79783259556933" class="legend-text">9%</text>
+<text x="570" y="146.39711012742583" class="legend-text">12%</text>
+<rect x="143" y="227" width="66" height="66" fill="none" stroke="#1565c0" stroke-width="3" rx="4"/>
+<text x="214" y="224" style="font-size:11px;fill:#1565c0;font-weight:600">← 推荐比分</text>
+</svg>
