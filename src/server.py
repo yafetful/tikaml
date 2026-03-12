@@ -10,13 +10,16 @@ Usage:
 
 import json
 import logging
+import os
+import secrets
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Security
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 from scipy.stats import poisson
 
@@ -25,17 +28,32 @@ from src.live_predictor import LivePredictor
 
 # ─── Config ────────────────────────────────────────────────────────
 
-MODEL_DIR = Path("models")
-CORNER_MODEL_DIR = Path("models/corners")
-YELLOW_MODEL_DIR = Path("models/yellows")
-MAX_GOALS = 7
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger("tika-server")
+
+MODEL_DIR = Path("models")
+CORNER_MODEL_DIR = Path("models/corners")
+YELLOW_MODEL_DIR = Path("models/yellows")
+MAX_GOALS = 7
+
+# API Key — set via environment variable, or auto-generate on first run
+API_KEY = os.environ.get("TIKA_API_KEY", "")
+if not API_KEY:
+    API_KEY = secrets.token_urlsafe(32)
+    log.warning(f"No TIKA_API_KEY set, generated: {API_KEY}")
+
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+async def verify_api_key(key: str = Security(api_key_header)):
+    """Validate the API key from request header."""
+    if not key or not secrets.compare_digest(key, API_KEY):
+        raise HTTPException(status_code=403, detail="Invalid API key")
+    return key
 
 
 # ─── Models (loaded once at startup) ──────────────────────────────
@@ -311,7 +329,7 @@ def predict_live(feature_vector: dict, ctx: MatchContext, requested_models: list
 
 # ─── Routes ────────────────────────────────────────────────────────
 
-@app.post("/predict", response_model=PredictionResponse)
+@app.post("/predict", response_model=PredictionResponse, dependencies=[Depends(verify_api_key)])
 async def predict(req: PredictionRequest):
     """Main prediction endpoint.
 
