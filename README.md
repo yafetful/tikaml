@@ -204,6 +204,9 @@ All methods evaluated under the same forward-chain validation protocol:
 | Bivariate Poisson (λ₃ correlation) | ±0.000 | λ₃ unstable across seasons (0.024 → 0.000 → 0.269) |
 | Score matrix post-processing | ±0.000 | Draw boost, adaptive ρ, 1x2 adjustments — all ineffective |
 | Draw specialist classifier | ±0.000 | P(draw) for actual draws ≈ P(draw) for non-draws (0.270 vs 0.269) |
+| Opta pre-match win probability | ±0.000 | Redundant with bookmaker odds (r² ≈ 0.98) |
+| Squad depth (roster size/position counts) | +0.0003 (worse) | Static season-level feature; too coarse to capture match-level dynamics |
+| Player-level XI features (27 variants) | ±0.0001 | Team rolling stats already encode player contributions; odds already price lineups |
 
 ### Key insight
 
