@@ -1,0 +1,9 @@
+.venv/
+data/
+experiments/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+README.md
+CLAUDE.md
