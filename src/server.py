@@ -364,9 +364,9 @@ async def predict(req: PredictionRequest):
     )
 
 
-@app.get("/health")
-async def health():
-    """Health check endpoint."""
+@app.get("/model-status")
+async def model_status():
+    """Model status check endpoint."""
     return {
         "status": "ok",
         "models_loaded": {
