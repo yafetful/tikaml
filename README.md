@@ -207,6 +207,7 @@ All methods evaluated under the same forward-chain validation protocol:
 | Opta pre-match win probability | ±0.000 | Redundant with bookmaker odds (r² ≈ 0.98) |
 | Squad depth (roster size/position counts) | +0.0003 (worse) | Static season-level feature; too coarse to capture match-level dynamics |
 | Player-level XI features (27 variants) | ±0.0001 | Team rolling stats already encode player contributions; odds already price lineups |
+| UCL combined training (leagues + UCL) | +0.0002 (worse) | UCL only 433 matchable games; zero-shot transfer (league model → UCL) already achieves RPS=0.1946 on group stage |
 
 ### Key insight
 
