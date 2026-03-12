@@ -15,6 +15,7 @@ build/
 # Raw data (not for distribution)
 data/opta/raw/
 data/opta/etl_log.txt
+data/opta/processed/season_ids.json
 data/odds/
 data/international/
 

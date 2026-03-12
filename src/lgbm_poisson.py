@@ -1,10 +1,11 @@
-"""LightGBM Poisson regression model for football goal prediction.
+"""LightGBM Poisson regression model for football count prediction.
 
 Trains two independent models:
-- Home goals model: predicts λ_home (Poisson rate for home team goals)
-- Away goals model: predicts λ_away (Poisson rate for away team goals)
+- Home model: predicts λ_home (Poisson rate for home team)
+- Away model: predicts λ_away (Poisson rate for away team)
 
-Score matrix is built from the two λ parameters with Dixon-Coles ρ correction.
+Primary use is goal prediction with Dixon-Coles correction, but also
+supports corners and yellow cards via custom target columns and feature sets.
 """
 
 import json
@@ -74,6 +75,21 @@ FEATURE_COLS = [
     "odds_prob_home", "odds_prob_draw", "odds_prob_away",
 ]
 
+# Corner prediction features: base features + corner-specific rolling
+CORNER_FEATURE_COLS = FEATURE_COLS + [
+    "corners_rolling_home", "corners_rolling_away",
+    "corners_rolling_conceded_home", "corners_rolling_conceded_away",
+    "referee_corners_rolling",
+]
+
+# Yellow card prediction features: base features + yellow/foul/referee rolling
+YELLOW_FEATURE_COLS = FEATURE_COLS + [
+    "yellows_rolling_home", "yellows_rolling_away",
+    "yellows_rolling_conceded_home", "yellows_rolling_conceded_away",
+    "referee_yellows_rolling",
+    "fouls_rolling_home", "fouls_rolling_away",
+]
+
 LGB_PARAMS = {
     "objective": "poisson",
     "metric": "poisson",
@@ -93,17 +109,23 @@ LGB_PARAMS = {
 
 class LGBMPoissonModel:
 
-    def __init__(self, rho=-0.108, temperature=0.90, params=None):
+    def __init__(self, rho=-0.108, temperature=0.90, params=None,
+                 target_home="home_goals", target_away="away_goals",
+                 feature_list=None, lambda_clip=(0.1, 5.0)):
         self.rho = rho
         self.temperature = temperature
         self.params = params or LGB_PARAMS.copy()
         self.model_home = None
         self.model_away = None
         self.feature_cols = None
+        self.target_home = target_home
+        self.target_away = target_away
+        self._feature_list = feature_list or FEATURE_COLS
+        self.lambda_clip = lambda_clip
 
     def _prepare_features(self, df):
         """Extract feature matrix, filling NaN with column medians."""
-        available = [c for c in FEATURE_COLS if c in df.columns]
+        available = [c for c in self._feature_list if c in df.columns]
         self.feature_cols = available
         X = df[available].copy()
         # Fill NaN with training median
@@ -113,28 +135,28 @@ class LGBMPoissonModel:
         return X
 
     def fit(self, df, val_df=None):
-        """Train home and away goal models.
+        """Train home and away Poisson models.
 
         Args:
-            df: DataFrame with feature columns and home_goals, away_goals.
+            df: DataFrame with feature columns and target columns.
             val_df: Optional validation DataFrame for early stopping.
                     If None, uses last 20% of training data (by time).
         """
         # Drop rows where target or key features are missing
-        mask = df["home_goals"].notna() & df["away_goals"].notna()
+        mask = df[self.target_home].notna() & df[self.target_away].notna()
         df_train = df[mask].copy()
 
         X = self._prepare_features(df_train)
-        y_home = df_train["home_goals"].values
-        y_away = df_train["away_goals"].values
+        y_home = df_train[self.target_home].values
+        y_away = df_train[self.target_away].values
 
         # Early stopping setup
         callbacks = [lgb.early_stopping(50, verbose=False)]
 
         if val_df is not None:
             X_val = self._prepare_features(val_df)
-            y_val_home = val_df["home_goals"].values
-            y_val_away = val_df["away_goals"].values
+            y_val_home = val_df[self.target_home].values
+            y_val_away = val_df[self.target_away].values
         else:
             # Use last 20% as validation (temporal split)
             split = int(len(X) * 0.8)
@@ -174,8 +196,8 @@ class LGBMPoissonModel:
             lambda_home = self.model_home.predict(X)
             lambda_away = self.model_away.predict(X)
         # Clip to reasonable range
-        lambda_home = np.clip(lambda_home, 0.1, 5.0)
-        lambda_away = np.clip(lambda_away, 0.1, 5.0)
+        lambda_home = np.clip(lambda_home, *self.lambda_clip)
+        lambda_away = np.clip(lambda_away, *self.lambda_clip)
         return lambda_home, lambda_away
 
     @staticmethod
@@ -248,6 +270,9 @@ class LGBMPoissonModel:
             "feature_cols": self.feature_cols,
             "medians": self._medians.to_dict(),
             "params": self.params,
+            "target_home": self.target_home,
+            "target_away": self.target_away,
+            "lambda_clip": list(self.lambda_clip),
         }
         with open(path / "meta.json", "w") as f:
             json.dump(meta, f, indent=2)
@@ -265,8 +290,12 @@ class LGBMPoissonModel:
             rho=meta["rho"],
             temperature=meta["temperature"],
             params=meta["params"],
+            target_home=meta.get("target_home", "home_goals"),
+            target_away=meta.get("target_away", "away_goals"),
+            lambda_clip=tuple(meta.get("lambda_clip", [0.1, 5.0])),
         )
         model.feature_cols = meta["feature_cols"]
+        model._feature_list = meta["feature_cols"]
 
         import pandas as pd
         model._medians = pd.Series(meta["medians"])

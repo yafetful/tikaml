@@ -16,16 +16,25 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from scipy.stats import poisson
 
-from src.lgbm_poisson import LGBMPoissonModel, FEATURE_COLS
+from src.lgbm_poisson import (
+    LGBMPoissonModel, FEATURE_COLS,
+    CORNER_FEATURE_COLS, YELLOW_FEATURE_COLS,
+)
+from src.live_predictor import LivePredictor
 
 FEATURES_PATH = Path("data/opta/processed/features.csv")
 MODEL_DIR = Path("models")
+CORNER_MODEL_DIR = Path("models/corners")
+YELLOW_MODEL_DIR = Path("models/yellows")
 
 # Map of rolling feature columns to the raw stat they came from
 # Used to extract team state from either _home or _away perspective
-ROLLING_HOME_COLS = [c for c in FEATURE_COLS if c.endswith("_home")]
-ROLLING_AWAY_COLS = [c for c in FEATURE_COLS if c.endswith("_away")]
+# Include corner/yellow rolling features for subsidiary models
+_ALL_FEATURES = sorted(set(FEATURE_COLS) | set(CORNER_FEATURE_COLS) | set(YELLOW_FEATURE_COLS))
+ROLLING_HOME_COLS = [c for c in _ALL_FEATURES if c.endswith("_home")]
+ROLLING_AWAY_COLS = [c for c in _ALL_FEATURES if c.endswith("_away")]
 
 # Features that are match-level (not team-specific)
 MATCH_LEVEL_FEATURES = [
@@ -50,6 +59,8 @@ class MatchPredictor:
         self.features_path = features_path or FEATURES_PATH
         self.df = None
         self.model = None
+        self.corner_model = None
+        self.yellow_model = None
         self._loaded = False
 
     def load_data(self):
@@ -90,12 +101,50 @@ class MatchPredictor:
         if save:
             self.model.save(str(MODEL_DIR))
 
+        # Train corner model (if data available)
+        corner_data = all_data[
+            all_data["corners_home"].notna() & all_data["corners_away"].notna()
+        ].copy()
+        if len(corner_data) > 500:
+            n_c = len(corner_data)
+            split_c = int(n_c * 0.8)
+            self.corner_model = LGBMPoissonModel(
+                target_home="corners_home", target_away="corners_away",
+                feature_list=CORNER_FEATURE_COLS, lambda_clip=(0.5, 15.0),
+            )
+            self.corner_model.fit(
+                corner_data.iloc[:split_c], val_df=corner_data.iloc[split_c:])
+            print(f"  角球模型训练完成: {split_c} 训练 / {n_c - split_c} 验证")
+            if save:
+                self.corner_model.save(str(CORNER_MODEL_DIR))
+
+        # Train yellow card model (if data available)
+        yellow_data = all_data[
+            all_data["yellows_home"].notna() & all_data["yellows_away"].notna()
+        ].copy()
+        if len(yellow_data) > 500:
+            n_y = len(yellow_data)
+            split_y = int(n_y * 0.8)
+            self.yellow_model = LGBMPoissonModel(
+                target_home="yellows_home", target_away="yellows_away",
+                feature_list=YELLOW_FEATURE_COLS, lambda_clip=(0.3, 8.0),
+            )
+            self.yellow_model.fit(
+                yellow_data.iloc[:split_y], val_df=yellow_data.iloc[split_y:])
+            print(f"  黄牌模型训练完成: {split_y} 训练 / {n_y - split_y} 验证")
+            if save:
+                self.yellow_model.save(str(YELLOW_MODEL_DIR))
+
         return self
 
     def load_model(self):
-        """Load a previously saved model from disk."""
+        """Load all saved models from disk (goals, corners, yellows)."""
         self.load_data()
         self.model = LGBMPoissonModel.load(str(MODEL_DIR))
+        if CORNER_MODEL_DIR.exists():
+            self.corner_model = LGBMPoissonModel.load(str(CORNER_MODEL_DIR))
+        if YELLOW_MODEL_DIR.exists():
+            self.yellow_model = LGBMPoissonModel.load(str(YELLOW_MODEL_DIR))
         return self
 
     def _get_team_state(self, team_name, before_date=None):
@@ -130,7 +179,7 @@ class MatchPredictor:
             # Team was away → map _away features to _home for prediction
             for col in ROLLING_AWAY_COLS:
                 home_col = col.replace("_away", "_home")
-                if col in last_match.index and home_col in FEATURE_COLS:
+                if col in last_match.index:
                     state[home_col] = last_match[col]
 
         # Also extract venue-specific features differently
@@ -588,6 +637,10 @@ class MatchPredictor:
             features["odds_prob_draw"] = np.nan
             features["odds_prob_away"] = np.nan
 
+        # 13. Referee features for subsidiary models (unknown → median fill)
+        features.setdefault("referee_corners_rolling", np.nan)
+        features.setdefault("referee_yellows_rolling", np.nan)
+
         return features
 
     def predict(self, home_team, away_team, league, season, match_date,
@@ -658,6 +711,33 @@ class MatchPredictor:
             "label": f"{rec[0]}-{rec[1]}",
         }
 
+        # Goals over/under from score matrix
+        goals_over_under = _compute_goals_over_under(matrix, max_goals)
+
+        # Corner predictions (if model loaded)
+        corners = None
+        if self.corner_model is not None:
+            clh, cla = self.corner_model.predict_lambdas(feat_df)
+            clh, cla = float(clh[0]), float(cla[0])
+            corners = {
+                "lambda_home": clh,
+                "lambda_away": cla,
+                "over_under": _compute_poisson_over_under(
+                    clh + cla, [8.5, 9.5, 10.5, 11.5]),
+            }
+
+        # Yellow card predictions (if model loaded)
+        yellows = None
+        if self.yellow_model is not None:
+            ylh, yla = self.yellow_model.predict_lambdas(feat_df)
+            ylh, yla = float(ylh[0]), float(yla[0])
+            yellows = {
+                "lambda_home": ylh,
+                "lambda_away": yla,
+                "over_under": _compute_poisson_over_under(
+                    ylh + yla, [2.5, 3.5, 4.5, 5.5]),
+            }
+
         return {
             "score_matrix": matrix,
             "probs_1x2": probs_1x2,
@@ -667,7 +747,162 @@ class MatchPredictor:
             "lambda_away": float(la),
             "top_scores": top_scores,
             "score_groups": score_groups,
+            "goals_over_under": goals_over_under,
+            "corners": corners,
+            "yellows": yellows,
             "features": features,
+        }
+
+    def predict_live(self, home_team, away_team, league, season, match_date,
+                      minute, home_goals, away_goals,
+                      home_red_cards=0, away_red_cards=0,
+                      home_corners=0, away_corners=0,
+                      home_yellows=0, away_yellows=0,
+                      week=None, odds=None, max_goals=7,
+                      lambda_home=None, lambda_away=None):
+        """Predict live match outcome.
+
+        Uses pre-match model to get λ_home/λ_away, then applies Bayesian
+        updating with current match state (score, time, red cards).
+
+        Output structure is identical to predict(), with additional live fields.
+
+        Args:
+            home_team, away_team, league, season, match_date, week, odds:
+                Same as predict(). Used to compute pre-match λ if not provided.
+            minute: Current match minute (0-90+).
+            home_goals: Current home team score.
+            away_goals: Current away team score.
+            home_red_cards: Total home red cards so far.
+            away_red_cards: Total away red cards so far.
+            lambda_home: Pre-computed home λ (skip pre-match prediction if given).
+            lambda_away: Pre-computed away λ.
+
+        Returns:
+            dict with same structure as predict(), plus:
+                - mode: "live"
+                - minute: current minute
+                - current_score: (home_goals, away_goals)
+                - next_goal: {home, away, none}
+                - over_under: {2.5: {over, under}, 3.5: {over, under}}
+                - lambda_remaining: (λ_home_remaining, λ_away_remaining)
+        """
+        if self.model is None:
+            raise ValueError("Model not trained. Call train() or load_model() first.")
+
+        # Get pre-match λ (either provided or computed)
+        prematch_corners = None
+        prematch_yellows = None
+        if lambda_home is not None and lambda_away is not None:
+            lh, la = lambda_home, lambda_away
+        else:
+            prematch = self.predict(
+                home_team, away_team, league, season, match_date,
+                week=week, odds=odds, max_goals=max_goals)
+            lh, la = prematch["lambda_home"], prematch["lambda_away"]
+            prematch_corners = prematch.get("corners")
+            prematch_yellows = prematch.get("yellows")
+
+        # Run live predictor
+        lp = LivePredictor(lh, la, rho=self.model.rho, max_goals=max_goals)
+        lp.update(minute=minute, home_goals=home_goals, away_goals=away_goals,
+                  home_red_cards=home_red_cards, away_red_cards=away_red_cards)
+        live = lp.get_probabilities()
+
+        # Build final score matrix from remaining matrix
+        # P(final=i, final=j) = P(remaining=i-hg, remaining=j-ag)
+        rem = live["remaining_matrix"]
+        matrix = np.zeros((max_goals, max_goals))
+        for i in range(max_goals):
+            for j in range(max_goals):
+                ri = i - home_goals
+                rj = j - away_goals
+                if 0 <= ri < max_goals and 0 <= rj < max_goals:
+                    matrix[i, j] = rem[ri, rj]
+        if matrix.sum() > 0:
+            matrix /= matrix.sum()
+
+        # 1x2 from live predictor (already computed, more accurate)
+        probs_1x2 = live["probs_1x2"]
+
+        # Top scores
+        flat = matrix.flatten()
+        top_idx = flat.argsort()[::-1][:5]
+        top_scores = []
+        for idx in top_idx:
+            i, j = divmod(idx, max_goals)
+            top_scores.append((int(i), int(j), float(flat[idx])))
+
+        # Score groups
+        score_groups = _build_score_groups(matrix, max_goals)
+
+        # Recommended score
+        outcome_idx = int(np.argmax(probs_1x2))
+        group_map = {0: "home_win", 1: "draw", 2: "away_win"}
+        pred_group = next(
+            g for g in score_groups if g["type"] == group_map[outcome_idx])
+        rec = pred_group["top_scores"][0]
+        recommended_score = {
+            "home_goals": rec[0],
+            "away_goals": rec[1],
+            "prob": rec[2],
+            "label": f"{rec[0]}-{rec[1]}",
+        }
+
+        # Goals over/under (from live predictor, already accounts for current score)
+        goals_over_under = live["over_under"]
+
+        # Corners/yellows with simple linear time decay (no score momentum)
+        r = max(0, (90 - minute) / 90)
+
+        corners_live = None
+        if prematch_corners is not None:
+            clh = prematch_corners["lambda_home"]
+            cla = prematch_corners["lambda_away"]
+            corners_live = {
+                "lambda_home": clh,
+                "lambda_away": cla,
+                "lambda_remaining": (clh * r, cla * r),
+                "over_under": _compute_live_over_under(
+                    (clh + cla) * r,
+                    home_corners + away_corners,
+                    [8.5, 9.5, 10.5, 11.5]),
+            }
+
+        yellows_live = None
+        if prematch_yellows is not None:
+            ylh = prematch_yellows["lambda_home"]
+            yla = prematch_yellows["lambda_away"]
+            yellows_live = {
+                "lambda_home": ylh,
+                "lambda_away": yla,
+                "lambda_remaining": (ylh * r, yla * r),
+                "over_under": _compute_live_over_under(
+                    (ylh + yla) * r,
+                    home_yellows + away_yellows,
+                    [2.5, 3.5, 4.5, 5.5]),
+            }
+
+        return {
+            # Same fields as predict()
+            "score_matrix": matrix,
+            "probs_1x2": probs_1x2,
+            "predicted_outcome": ["home_win", "draw", "away_win"][outcome_idx],
+            "recommended_score": recommended_score,
+            "lambda_home": float(lh),
+            "lambda_away": float(la),
+            "top_scores": top_scores,
+            "score_groups": score_groups,
+            "goals_over_under": goals_over_under,
+            "corners": corners_live,
+            "yellows": yellows_live,
+            # Live-specific fields
+            "mode": "live",
+            "minute": minute,
+            "current_score": (home_goals, away_goals),
+            "next_goal": live["next_goal"],
+            "over_under": live["over_under"],
+            "lambda_remaining": live["lambda_remaining"],
         }
 
     def predict_batch(self, matches, max_goals=7):
@@ -693,6 +928,41 @@ class MatchPredictor:
             result["match_info"] = m
             results.append(result)
         return results
+
+
+def _compute_goals_over_under(matrix, max_goals=7):
+    """Compute goals over/under probabilities from score matrix."""
+    ou = {}
+    for line in [1.5, 2.5, 3.5]:
+        p_over = 0.0
+        for i in range(max_goals):
+            for j in range(max_goals):
+                if i + j > line:
+                    p_over += matrix[i, j]
+        ou[line] = {"over": float(p_over), "under": float(1 - p_over)}
+    return ou
+
+
+def _compute_poisson_over_under(lambda_total, lines):
+    """Compute over/under probabilities from total Poisson λ."""
+    ou = {}
+    for line in lines:
+        p_over = float(1 - poisson.cdf(int(line), lambda_total))
+        ou[line] = {"over": p_over, "under": 1.0 - p_over}
+    return ou
+
+
+def _compute_live_over_under(lambda_remaining, current_total, lines):
+    """Compute live over/under given remaining Poisson λ and current count."""
+    ou = {}
+    for line in lines:
+        needed = line - current_total
+        if needed <= 0:
+            ou[line] = {"over": 1.0, "under": 0.0}
+        else:
+            p_over = float(1 - poisson.cdf(int(needed), lambda_remaining))
+            ou[line] = {"over": p_over, "under": 1.0 - p_over}
+    return ou
 
 
 def _build_score_groups(matrix, max_goals=7):
@@ -749,17 +1019,28 @@ def _build_score_groups(matrix, max_goals=7):
 
 
 def format_prediction(result, show_matrix=True):
-    """Format a prediction result for display."""
+    """Format a prediction result for display.
+
+    Works for both pre-match and live predictions.
+    """
     info = result.get("match_info", {})
     home = info.get("home_team", "Home")
     away = info.get("away_team", "Away")
     p = result["probs_1x2"]
     lh = result["lambda_home"]
     la = result["lambda_away"]
+    is_live = result.get("mode") == "live"
 
     lines = []
-    lines.append(f"  {home} vs {away}")
-    lines.append(f"  λ_home={lh:.2f}  λ_away={la:.2f}")
+    if is_live:
+        minute = result["minute"]
+        hg, ag = result["current_score"]
+        lh_rem, la_rem = result["lambda_remaining"]
+        lines.append(f"  {home} vs {away}  [{minute}' | {hg}-{ag}]")
+        lines.append(f"  λ_prematch={lh:.2f}/{la:.2f}  λ_remaining={lh_rem:.2f}/{la_rem:.2f}")
+    else:
+        lines.append(f"  {home} vs {away}")
+        lines.append(f"  λ_home={lh:.2f}  λ_away={la:.2f}")
     lines.append(f"  主胜 {p[0]:.1%}  |  平局 {p[1]:.1%}  |  客胜 {p[2]:.1%}")
 
     # Most likely outcome + recommended score
@@ -787,9 +1068,52 @@ def format_prediction(result, show_matrix=True):
         for h, a, prob in result["top_scores"]:
             lines.append(f"    {h}-{a}: {prob:.1%}")
 
+    # Goals over/under
+    goals_ou = result.get("goals_over_under", {})
+    if goals_ou:
+        ou_parts = []
+        for line in sorted(goals_ou.keys()):
+            ou_parts.append(f"O{line} {goals_ou[line]['over']:.1%}")
+        lines.append(f"\n  进球大小: {' | '.join(ou_parts)}")
+
+    # Live-specific: next goal
+    if is_live:
+        ng = result.get("next_goal", {})
+        if ng:
+            lines.append(
+                f"  下一球: 主 {ng['home']:.1%} | 客 {ng['away']:.1%} | 无 {ng['none']:.1%}")
+
+    # Corners
+    corners = result.get("corners")
+    if corners:
+        clh = corners["lambda_home"]
+        cla = corners["lambda_away"]
+        c_ou = corners["over_under"]
+        ou_parts = [f"O{line} {c_ou[line]['over']:.1%}" for line in sorted(c_ou.keys())]
+        if is_live and "lambda_remaining" in corners:
+            cr_h, cr_a = corners["lambda_remaining"]
+            lines.append(f"\n  角球: λ={clh:.1f}/{cla:.1f}  λ_rem={cr_h:.1f}/{cr_a:.1f}")
+        else:
+            lines.append(f"\n  角球: λ_home={clh:.1f}  λ_away={cla:.1f}")
+        lines.append(f"  角球大小: {' | '.join(ou_parts)}")
+
+    # Yellows
+    yellows = result.get("yellows")
+    if yellows:
+        ylh = yellows["lambda_home"]
+        yla = yellows["lambda_away"]
+        y_ou = yellows["over_under"]
+        ou_parts = [f"O{line} {y_ou[line]['over']:.1%}" for line in sorted(y_ou.keys())]
+        if is_live and "lambda_remaining" in yellows:
+            yr_h, yr_a = yellows["lambda_remaining"]
+            lines.append(f"\n  黄牌: λ={ylh:.1f}/{yla:.1f}  λ_rem={yr_h:.1f}/{yr_a:.1f}")
+        else:
+            lines.append(f"\n  黄牌: λ_home={ylh:.1f}  λ_away={yla:.1f}")
+        lines.append(f"  黄牌大小: {' | '.join(ou_parts)}")
+
     if show_matrix:
         matrix = result["score_matrix"]
-        lines.append(f"\n  7×7 比分概率矩阵 (%):")
+        lines.append(f"\n  7×7 {'最终' if is_live else ''}比分概率矩阵 (%):")
         lines.append(f"  {'':>4}" + "".join(f"{j:>6}" for j in range(7)))
         for i in range(7):
             row_str = f"  {i:>3}|"
