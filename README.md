@@ -1,49 +1,65 @@
-# TikaML — Football Match Outcome Prediction
+# TikaML — Football Match Prediction
 
-A machine learning system for predicting football match outcomes using LightGBM Poisson regression. The model outputs a full 7×7 score probability matrix for each match, enabling rich downstream analysis including 1x2 outcome probabilities, most likely scorelines, and expected goals.
+A machine learning system for predicting football match outcomes, corners, and yellow cards using LightGBM Poisson regression. Three independent models output full probability distributions for goals, corners, and cards — both pre-match and live (in-play).
 
-Trained on 17,469 matches across Europe's top 5 leagues (2016–2026), the model achieves an average **RPS of 0.197** under strict forward-chain temporal validation.
+Trained on 17,469 matches across Europe's top 5 leagues (2016–2026), the goal model achieves an average **RPS of 0.197** under strict forward-chain temporal validation.
 
 ## Table of Contents
 
 - [Model Architecture](#model-architecture)
 - [Why LightGBM + Poisson?](#why-lightgbm--poisson)
 - [Feature Engineering](#feature-engineering)
+- [Live Prediction](#live-prediction)
 - [Evaluation](#evaluation)
 - [Comparison of Approaches](#comparison-of-approaches)
 - [Known Limitations](#known-limitations)
 - [Getting Started](#getting-started)
 - [Project Structure](#project-structure)
-- [Citation](#citation)
+- [References](#references)
 
 ---
 
 ## Model Architecture
 
+### Three-Model System
+
 ```
-84 features (per-match)
+Feature Vector (84–91 features per match)
     ↓
-LightGBM (objective=poisson) × 2
-    ├─ Model A → λ_home (expected home goals)
-    └─ Model B → λ_away (expected away goals)
-    ↓
-Poisson PMF:  P(k | λ) = λ^k · e^(-λ) / k!
-    ↓
-7×7 score matrix  P(i, j) = P(home=i) · P(away=j) · τ(i,j,λ_h,λ_a,ρ)
-    ↓
-Dixon-Coles correction (ρ = -0.108) for low-scoring matches
-    ↓
-Temperature scaling (T = 0.90) to correct conservative bias
-    ↓
-Final outputs:
-    ├─ 1x2 probabilities: P(Home Win), P(Draw), P(Away Win)
-    ├─ Recommended score (from predicted outcome group)
-    └─ Full 7×7 score probability matrix
+┌─────────────────────────────────────────────────────────────┐
+│  Model 1: Goals (84 features)                               │
+│  LightGBM Poisson × 2 → λ_home, λ_away                     │
+│  → 7×7 score matrix → 1x2 + O/U 1.5, 2.5, 3.5             │
+├─────────────────────────────────────────────────────────────┤
+│  Model 2: Corners (89 features)                              │
+│  LightGBM Poisson × 2 → λ_corners_home, λ_corners_away     │
+│  → O/U 8.5, 9.5, 10.5, 11.5                                │
+├─────────────────────────────────────────────────────────────┤
+│  Model 3: Yellow Cards (91 features)                         │
+│  LightGBM Poisson × 2 → λ_yellows_home, λ_yellows_away     │
+│  → O/U 2.5, 3.5, 4.5, 5.5                                  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-**Two independent Poisson models** predict the expected goal rates (λ) for home and away teams separately. The score probability matrix is then constructed analytically via the Poisson distribution, with a Dixon-Coles low-score correction factor τ that adjusts probabilities for 0-0, 0-1, 1-0, and 1-1 scorelines.
+Each model consists of **two independent Poisson regressors** predicting the expected rates (λ) for home and away teams separately. The goal model additionally constructs a 7×7 score probability matrix with a **Dixon-Coles low-score correction** (ρ = -0.108) and **temperature scaling** (T = 0.90) to correct conservative bias at high confidence levels.
 
-**Temperature scaling** (T=0.90) sharpens the 1x2 probability distribution, correcting a systematic conservative bias observed at high-confidence predictions (model predicts P(H)=75–90%, actual win rate ≈87%).
+All three models share the same 84-feature base, with corners adding 5 corner-specific rolling features and yellows adding 7 card/foul-specific rolling features.
+
+### Live Prediction Engine
+
+```
+Pre-match λ_home, λ_away
+    ↓
+Bayesian Poisson Updating
+    ├─ Non-linear time decay (r^0.82)
+    ├─ 6-bucket score-aware momentum
+    ├─ Red card impact (0.61× self / 1.46× opponent)
+    └─ Dixon-Coles ρ decay over time
+    ↓
+Updated 1x2, O/U, next goal, remaining λ
+```
+
+The live predictor applies Bayesian updating to pre-match Poisson rates, adjusting for elapsed time, current score momentum, and red cards. Parameters were optimized via differential evolution on 150 matches against Opta live predictions (MAE = 0.030).
 
 ## Why LightGBM + Poisson?
 
@@ -79,7 +95,7 @@ Traditional Poisson regression (`log(λ) = Xβ`) captures the right distribution
 
 ## Feature Engineering
 
-The model uses **84 features** across 12 categories, all computable from pre-match information only (no data leakage):
+The base model uses **84 features** across 12 categories, all computable from pre-match information only (no data leakage). Corner and yellow card models extend this with domain-specific rolling features.
 
 | Category | Features | Count | Description |
 |----------|----------|-------|-------------|
@@ -96,18 +112,34 @@ The model uses **84 features** across 12 categories, all computable from pre-mat
 | Match Importance | relegation_battle, title_race, points_to_safety/leader, composite | 5 | Stakes and competitive pressure |
 | Lineup Rotation | changes, stability, formation_change, rotation_rate (home/away) | 8 | Squad management patterns |
 | Market Odds | implied probabilities (home/draw/away) | 3 | Bookmaker market consensus (optional) |
-| **Total** | | **84** | |
+| **Base Total** | | **84** | |
+| Corner-specific | corners_rolling, corners_conceded, referee_corners | +5 | 10-match rolling corner stats |
+| Yellow-specific | yellows_rolling, yellows_conceded, fouls_rolling, referee_yellows | +7 | 10-match rolling card/foul stats |
 
 ### Data Scale
 
 - **Leagues**: Premier League (EPL), La Liga, Serie A, Bundesliga, Ligue 1
 - **Time span**: 12 seasons (2014–2026)
 - **Total matches**: 21,121 (17,469 used for training from 2016+)
-- **Feature table dimensions**: 21,121 rows × 225 columns (84 used by model)
+- **Feature table dimensions**: 21,121 rows × 253 columns
 - **Odds coverage**: ~51% overall, ~77% for 2018+ seasons
-- **Lineup feature coverage**: 82.4%
+- **Corner data coverage**: 17,207 matches (98.5%)
+- **Yellow card data coverage**: 14,902 matches (85.3%)
 
 The processed feature table (`data/opta/processed/features.csv`) is included in this repository for research purposes. Raw match event data is not distributed.
+
+## Live Prediction
+
+The live prediction engine (`src/live_predictor.py`) provides real-time probability updates during matches. It takes the pre-match Poisson rates as priors and applies Bayesian updating based on:
+
+- **Non-linear time decay** (r^0.82): accounts for goals clustering in late periods
+- **Score-aware momentum** (6 buckets): teams losing by 3+ attack harder (1.40× multiplier), winning teams sit back (0.85×)
+- **Red card factors**: a red card reduces the team's scoring rate to 0.61× and boosts the opponent to 1.46×
+- **Dixon-Coles decay**: ρ correction diminishes linearly as match progresses
+
+All parameters were optimized via differential evolution on 150 EPL/La Liga matches against Opta live predictions and validated with 3-fold cross-validation (MAE = 0.030, consistent across folds).
+
+Corner and yellow card live predictions use simple linear time decay (no score momentum), as these events lack the strong score-dependency of goals.
 
 ## Evaluation
 
@@ -216,11 +248,11 @@ pip install numpy scipy pandas lightgbm scikit-learn optuna
 ```python
 from src.inference import MatchPredictor
 
-# Load pre-trained model (included in models/)
+# Load pre-trained models (goals + corners + yellows)
 predictor = MatchPredictor()
 predictor.load_model()
 
-# Predict a match
+# Pre-match prediction
 result = predictor.predict(
     home_team="Arsenal",
     away_team="Chelsea",
@@ -230,10 +262,30 @@ result = predictor.predict(
 )
 
 # Access results
-print(result["probs_1x2"])          # [P(Home), P(Draw), P(Away)]
-print(result["recommended_score"])   # {"label": "2-1", "prob": 0.10, ...}
-print(result["lambda_home"])         # Expected home goals
-print(result["score_matrix"])        # 7×7 numpy array
+print(result["probs_1x2"])            # [P(Home), P(Draw), P(Away)]
+print(result["recommended_score"])     # {"label": "2-1", "prob": 0.10, ...}
+print(result["goals_over_under"])      # {1.5: {over, under}, 2.5: ..., 3.5: ...}
+print(result["corners"])               # {lambda_home, lambda_away, over_under: {8.5, 9.5, ...}}
+print(result["yellows"])               # {lambda_home, lambda_away, over_under: {2.5, 3.5, ...}}
+```
+
+### Live (In-Play) Prediction
+
+```python
+# Live prediction at 35', score 1-0, 3 corners each side
+result = predictor.predict_live(
+    home_team="Arsenal", away_team="Chelsea",
+    league="EPL", season="2025-2026", match_date="2026-03-15",
+    minute=35, home_goals=1, away_goals=0,
+    home_corners=3, away_corners=1,
+    home_yellows=1, away_yellows=0,
+    home_red_cards=0, away_red_cards=0,
+)
+
+print(result["probs_1x2"])        # Updated 1x2 probabilities
+print(result["next_goal"])        # {home: 0.51, away: 0.33, none: 0.16}
+print(result["lambda_remaining"]) # Remaining expected goals
+print(result["corners"])          # Corners with remaining λ and updated O/U
 ```
 
 ### CLI Prediction
@@ -253,23 +305,31 @@ python scripts/predict.py
 
 ```
 Arsenal vs Chelsea
-λ_home=2.03  λ_away=1.02
-主胜 59.4%  |  平局 23.2%  |  客胜 17.4%
+λ_home=1.96  λ_away=1.08
+主胜 56.5%  |  平局 24.0%  |  客胜 19.5%
 预测结果: 主胜  |  推荐比分: 2-1 (10.0%)
 
 三组比分预测:
-  主胜 [59.4%]: 2-1(10.0%), 1-0(9.8%), 2-0(9.5%)
-  平局 [23.2%]: 1-1(11.5%), 0-0(6.0%), 2-2(5.3%)
-  客胜 [17.4%]: 0-1(5.0%), 1-2(4.8%), 0-2(3.2%)
+  主胜 [56.5%]: 2-1(10.0%), 2-0(9.2%), 1-0(8.3%)
+  平局 [24.0%]: 1-1(11.3%), 0-0(5.9%), 2-2(5.4%)
+  客胜 [19.5%]: 1-2(5.5%), 0-1(4.1%), 0-2(2.8%)
+
+进球大小: O1.5 81.8% | O2.5 58.5% | O3.5 36.0%
+
+角球: λ_home=6.1  λ_away=4.1
+角球大小: O8.5 67.9% | O9.5 55.6% | O10.5 43.1% | O11.5 31.6%
+
+黄牌: λ_home=1.9  λ_away=2.3
+黄牌大小: O2.5 79.5% | O3.5 61.2% | O4.5 41.8% | O5.5 25.3%
 ```
 
 ### Retraining
 
-To retrain the model on updated data:
+To retrain all three models on updated data:
 
 ```python
 predictor = MatchPredictor()
-predictor.train(save=True)  # Trains on all data, saves to models/
+predictor.train(save=True)  # Trains goals + corners + yellows, saves to models/
 ```
 
 ### Hyperparameter Tuning
@@ -290,7 +350,8 @@ python scripts/run_lgbm.py   # Forward-chain validation with detailed metrics
 tikaml/
 ├── src/
 │   ├── lgbm_poisson.py      # Core model: LightGBM Poisson regression + Dixon-Coles
-│   ├── inference.py          # Inference engine: feature extraction + prediction
+│   ├── inference.py          # Inference engine: pre-match + live prediction
+│   ├── live_predictor.py     # Live (in-play) Bayesian Poisson updating engine
 │   └── evaluation.py         # Metrics: RPS, accuracy, calibration
 ├── scripts/
 │   ├── predict.py            # CLI prediction tool
@@ -299,10 +360,18 @@ tikaml/
 ├── models/
 │   ├── lgbm_home.txt         # Trained home goals model
 │   ├── lgbm_away.txt         # Trained away goals model
-│   └── meta.json             # Model metadata (features, parameters, medians)
+│   ├── meta.json             # Goals model metadata
+│   ├── corners/              # Corner prediction model
+│   │   ├── lgbm_home.txt
+│   │   ├── lgbm_away.txt
+│   │   └── meta.json
+│   └── yellows/              # Yellow card prediction model
+│       ├── lgbm_home.txt
+│       ├── lgbm_away.txt
+│       └── meta.json
 ├── data/
 │   └── opta/processed/
-│       └── features.csv      # Processed feature table (21,121 × 225)
+│       └── features.csv      # Processed feature table (21,121 × 253)
 ├── experiments/              # Experimental code (stacking, neural net, etc.)
 ├── doc/
 │   ├── model_report.md       # Detailed model progress report
