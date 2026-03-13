@@ -2,7 +2,7 @@
 
 A machine learning system for predicting football match outcomes, corners, and yellow cards using LightGBM Poisson regression. Three independent models output full probability distributions for goals, corners, and cards — both pre-match and live (in-play).
 
-Trained on 17,469 matches across Europe's top 5 leagues (2016–2026), the goal model achieves an average **RPS of 0.197** under strict forward-chain temporal validation.
+Trained on 17,469 matches across Europe's top 5 leagues (2016–2026), the goal model achieves an average **RPS of 0.1968** under strict forward-chain temporal validation. The system is deployed as a FastAPI prediction service with Docker, serving both real-time and historical backfill predictions.
 
 ## Table of Contents
 
@@ -13,6 +13,7 @@ Trained on 17,469 matches across Europe's top 5 leagues (2016–2026), the goal 
 - [Evaluation](#evaluation)
 - [Comparison of Approaches](#comparison-of-approaches)
 - [Known Limitations](#known-limitations)
+- [Prediction Service API](#prediction-service-api)
 - [Getting Started](#getting-started)
 - [Project Structure](#project-structure)
 - [References](#references)
@@ -121,8 +122,8 @@ The base model uses **84 features** across 12 categories, all computable from pr
 - **Leagues**: Premier League (EPL), La Liga, Serie A, Bundesliga, Ligue 1
 - **Time span**: 12 seasons (2014–2026)
 - **Total matches**: 21,121 (17,469 used for training from 2016+)
-- **Feature table dimensions**: 21,121 rows × 253 columns
-- **Odds coverage**: ~51% overall, ~77% for 2018+ seasons
+- **Feature table dimensions**: 21,121 rows × 245 columns
+- **Odds coverage**: ~93% for 2018+ seasons (EPL/La Liga/Serie A ≈100%, Bundesliga 84%, Ligue 1 76%)
 - **Corner data coverage**: 17,207 matches (98.5%)
 - **Yellow card data coverage**: 14,902 matches (85.3%)
 
@@ -159,7 +160,7 @@ We use **forward-chain temporal validation** (also known as expanding window):
 | 2023-2024 | 1,752 | 0.1908 | 54.2% | 71.1% |
 | 2024-2025 | 1,750 | 0.1974 | 53.5% | 67.5% |
 | 2025-2026 | 1,290 | 0.1990 | 52.4% | 70.3% |
-| **Average** | | **0.1973** | **53.3%** | **69.2%** |
+| **Average** | | **0.1968** | **53.3%** | **69.2%** |
 
 **RPS (Ranked Probability Score)** is the primary metric — it measures the quality of the full probability distribution, not just the top prediction. Lower is better.
 
@@ -190,7 +191,8 @@ All methods evaluated under the same forward-chain validation protocol:
 | Neural network (team embeddings) | 0.1993 | Insufficient data; 53 draw predictions but no RPS gain |
 | + Market odds implied probabilities | 0.1979 | 3 odds features; strongest single addition |
 | + Temperature scaling (T=0.90) | 0.1976 | Corrects conservative bias at extremes |
-| **+ Match importance + Lineup rotation** | **0.1973** | **Final model: 84 features** |
+| + Match importance + Lineup rotation | 0.1973 | 84 features |
+| **+ Odds coverage fix (mapping correction)** | **0.1968** | **Final model: 84 features, ~61% odds coverage** |
 | Bookmaker consensus (reference) | ~0.185 | Target benchmark |
 
 ### Methods that did NOT improve results
@@ -229,7 +231,7 @@ Away wins contribute 41% of total RPS loss despite being only 31% of outcomes. U
 
 | | RPS |
 |--|-----|
-| TikaML | 0.197 |
+| TikaML | 0.1968 |
 | Bookmakers | ~0.185 |
 | Gap | +0.012 |
 
@@ -237,6 +239,53 @@ The gap is primarily driven by:
 - **Real-time information** (~60%): injuries, confirmed lineups, transfers, player fitness — bookmakers have dedicated teams tracking these
 - **Market wisdom** (~25%): aggregated judgment from thousands of bettors
 - **Model structure** (~15%): Poisson distributional constraints on low-score matches
+
+## Prediction Service API
+
+The models are deployed as a FastAPI service via Docker, designed to integrate with an upstream data service that computes feature vectors.
+
+### Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/predict` | API key | Production predictions (pre-match + live) |
+| `POST` | `/backfill` | API key | Historical backfill predictions (pre-match only, model trained ≤ 2026-01-31) |
+| `GET` | `/model-status` | None | Model loading status and version |
+
+### Deployment
+
+```bash
+# Set API key and start
+export TIKA_API_KEY="your-secret-key"
+docker compose up -d
+
+# Or run directly
+uvicorn src.server:app --host 0.0.0.0 --port 8001
+```
+
+The container joins the `infra_default` Docker network for inter-service communication (e.g., data service accesses `http://tikaml-predict:8001`).
+
+### Request / Response
+
+```json
+// POST /predict
+{
+  "match_id": 12345,
+  "prediction_type": "prematch",
+  "feature_vector": {"xg_rolling_home": 1.5, "...": "..."},
+  "models": ["goals", "corners", "yellows"]
+}
+
+// Response
+{
+  "predictions": {
+    "goals": {"home_win": 0.55, "draw": 0.24, "away_win": 0.21, "over_under": {...}},
+    "corners": {"expected_home": 6.1, "predicted_total": 10.2, "over_under": {...}},
+    "yellows": {"expected_home": 1.9, "predicted_total": 4.2, "over_under": {...}}
+  },
+  "model_metadata": {"version": "lgbm-poisson-84f", "elapsed_ms": 2.3}
+}
+```
 
 ## Getting Started
 
@@ -354,6 +403,7 @@ python scripts/run_lgbm.py   # Forward-chain validation with detailed metrics
 tikaml/
 ├── src/
 │   ├── lgbm_poisson.py      # Core model: LightGBM Poisson regression + Dixon-Coles
+│   ├── server.py             # FastAPI prediction service (predict / backfill / model-status)
 │   ├── inference.py          # Inference engine: pre-match + live prediction
 │   ├── live_predictor.py     # Live (in-play) Bayesian Poisson updating engine
 │   └── evaluation.py         # Metrics: RPS, accuracy, calibration
@@ -366,16 +416,16 @@ tikaml/
 │   ├── lgbm_away.txt         # Trained away goals model
 │   ├── meta.json             # Goals model metadata
 │   ├── corners/              # Corner prediction model
-│   │   ├── lgbm_home.txt
-│   │   ├── lgbm_away.txt
-│   │   └── meta.json
-│   └── yellows/              # Yellow card prediction model
-│       ├── lgbm_home.txt
-│       ├── lgbm_away.txt
-│       └── meta.json
+│   ├── yellows/              # Yellow card prediction model
+│   └── backfill_20260131/    # Backfill models (trained ≤ 2026-01-31)
+│       ├── goals/
+│       ├── corners/
+│       └── yellows/
 ├── data/
 │   └── opta/processed/
-│       └── features.csv      # Processed feature table (21,121 × 253)
+│       └── features.csv      # Processed feature table (21,121 × 245)
+├── Dockerfile                # Production container
+├── docker-compose.yml        # Docker deployment (infra_default network)
 ├── experiments/              # Experimental code (stacking, neural net, etc.)
 ├── doc/
 │   ├── model_report.md       # Detailed model progress report
