@@ -223,6 +223,16 @@ def predict_prematch(feature_vector: dict, requested_models: list[str], m: Model
         total = p_home + p_draw + p_away
         p_home, p_draw, p_away = p_home / total, p_draw / total, p_away / total
 
+        # Score matrix as nested list (7x7) and recommended score
+        score_matrix = [[round(float(matrix[i, j]), 4) for j in range(MAX_GOALS)] for i in range(MAX_GOALS)]
+        best_i, best_j = divmod(int(np.argmax(matrix)), MAX_GOALS)
+        recommended_score = {
+            "home_goals": best_i,
+            "away_goals": best_j,
+            "prob": round(float(matrix[best_i, best_j]), 4),
+            "label": f"{best_i}-{best_j}",
+        }
+
         predictions["goals"] = {
             "home_win": round(p_home, 4),
             "draw": round(p_draw, 4),
@@ -231,6 +241,8 @@ def predict_prematch(feature_vector: dict, requested_models: list[str], m: Model
             "expected_away": round(la, 4),
             "predicted_total": round(lh + la, 4),
             "over_under": _goals_over_under(matrix),
+            "score_matrix": score_matrix,
+            "recommended_score": recommended_score,
         }
 
     # Corners model
@@ -285,6 +297,26 @@ def predict_live(feature_vector: dict, ctx: MatchContext, requested_models: list
         )
         live = lp.get_probabilities()
 
+        # Build final score matrix from remaining matrix
+        rem = live["remaining_matrix"]
+        matrix = np.zeros((MAX_GOALS, MAX_GOALS))
+        for i in range(MAX_GOALS):
+            for j in range(MAX_GOALS):
+                ri, rj = i - ctx.home_score, j - ctx.away_score
+                if 0 <= ri < MAX_GOALS and 0 <= rj < MAX_GOALS:
+                    matrix[i, j] = rem[ri, rj]
+        if matrix.sum() > 0:
+            matrix /= matrix.sum()
+
+        score_matrix = [[round(float(matrix[i, j]), 4) for j in range(MAX_GOALS)] for i in range(MAX_GOALS)]
+        best_i, best_j = divmod(int(np.argmax(matrix)), MAX_GOALS)
+        recommended_score = {
+            "home_goals": best_i,
+            "away_goals": best_j,
+            "prob": round(float(matrix[best_i, best_j]), 4),
+            "label": f"{best_i}-{best_j}",
+        }
+
         predictions["goals"] = {
             "home_win": round(float(live["probs_1x2"][0]), 4),
             "draw": round(float(live["probs_1x2"][1]), 4),
@@ -301,6 +333,8 @@ def predict_live(feature_vector: dict, ctx: MatchContext, requested_models: list
             "next_goal": {
                 k: round(float(v), 4) for k, v in live["next_goal"].items()
             },
+            "score_matrix": score_matrix,
+            "recommended_score": recommended_score,
         }
 
     # Corners — simple time-decay for live
