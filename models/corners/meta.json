@@ -89,7 +89,8 @@
     "corners_rolling_home",
     "corners_rolling_away",
     "corners_rolling_conceded_home",
-    "corners_rolling_conceded_away"
+    "corners_rolling_conceded_away",
+    "referee_corners_rolling"
   ],
   "medians": {
     "xg_rolling_home": 1.311189785724836,
@@ -179,7 +180,8 @@
     "corners_rolling_home": 4.8784469935106,
     "corners_rolling_away": 4.952988703450675,
     "corners_rolling_conceded_home": 4.984036827280959,
-    "corners_rolling_conceded_away": 4.909162351571464
+    "corners_rolling_conceded_away": 4.909162351571464,
+    "referee_corners_rolling": 9.92097665998574
   },
   "params": {
     "objective": "poisson",

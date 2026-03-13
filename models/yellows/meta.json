@@ -90,6 +90,7 @@
     "yellows_rolling_away",
     "yellows_rolling_conceded_home",
     "yellows_rolling_conceded_away",
+    "referee_yellows_rolling",
     "fouls_rolling_home",
     "fouls_rolling_away"
   ],
@@ -182,6 +183,7 @@
     "yellows_rolling_away": 2.2282803388313877,
     "yellows_rolling_conceded_home": 2.2387815886408995,
     "yellows_rolling_conceded_away": 2.259229416468634,
+    "referee_yellows_rolling": 4.563969165469043,
     "fouls_rolling_home": 12.623098300369811,
     "fouls_rolling_away": 12.577990562130918
   },
