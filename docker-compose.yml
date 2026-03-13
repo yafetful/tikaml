@@ -1,0 +1,15 @@
+services:
+  predict:
+    build: .
+    container_name: tikaml-predict
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8001:8001"
+    environment:
+      - TIKA_API_KEY=${TIKA_API_KEY}
+    networks:
+      - infra_default
+
+networks:
+  infra_default:
+    external: true

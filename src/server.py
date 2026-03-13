@@ -38,6 +38,7 @@ log = logging.getLogger("tika-server")
 MODEL_DIR = Path("models")
 CORNER_MODEL_DIR = Path("models/corners")
 YELLOW_MODEL_DIR = Path("models/yellows")
+BACKFILL_DIR = Path("models/backfill_20260131")
 MAX_GOALS = 7
 
 # API Key — set via environment variable, or auto-generate on first run
@@ -65,6 +66,7 @@ class Models:
     version: str = "unknown"
 
 models = Models()
+backfill_models = Models()
 
 
 @asynccontextmanager
@@ -90,6 +92,21 @@ async def lifespan(app: FastAPI):
         with open(meta_path) as f:
             meta = json.load(f)
         models.version = f"lgbm-poisson-{len(meta.get('feature_cols', []))}f"
+
+    # Load backfill models (optional)
+    if BACKFILL_DIR.exists():
+        bf_goals_dir = BACKFILL_DIR / "goals"
+        bf_corners_dir = BACKFILL_DIR / "corners"
+        bf_yellows_dir = BACKFILL_DIR / "yellows"
+
+        if bf_goals_dir.exists():
+            backfill_models.goals = LGBMPoissonModel.load(str(bf_goals_dir))
+        if bf_corners_dir.exists():
+            backfill_models.corners = LGBMPoissonModel.load(str(bf_corners_dir))
+        if bf_yellows_dir.exists():
+            backfill_models.yellows = LGBMPoissonModel.load(str(bf_yellows_dir))
+        backfill_models.version = "lgbm-poisson-backfill-20260131"
+        log.info("  Backfill models loaded")
 
     log.info(f"  All models loaded in {time.time() - t0:.1f}s")
     yield
@@ -188,17 +205,18 @@ def _live_over_under(lambda_remaining: float, current_total: int, lines: list[fl
 
 # ─── Prediction logic ─────────────────────────────────────────────
 
-def predict_prematch(feature_vector: dict, requested_models: list[str]) -> dict:
-    """Run pre-match prediction."""
+def predict_prematch(feature_vector: dict, requested_models: list[str], m: Models | None = None) -> dict:
+    """Run pre-match prediction using the given model set."""
+    m = m or models
     predictions = {}
 
     # Goals model
-    if "goals" in requested_models and models.goals:
-        feat_df = _build_feature_df(feature_vector, models.goals.feature_cols)
-        lh, la = models.goals.predict_lambdas(feat_df)
+    if "goals" in requested_models and m.goals:
+        feat_df = _build_feature_df(feature_vector, m.goals.feature_cols)
+        lh, la = m.goals.predict_lambdas(feat_df)
         lh, la = float(lh[0]), float(la[0])
 
-        matrix = models.goals.predict_score_matrix(lh, la, MAX_GOALS)
+        matrix = m.goals.predict_score_matrix(lh, la, MAX_GOALS)
         p_home = float(np.tril(matrix, -1).sum())
         p_draw = float(np.trace(matrix))
         p_away = float(np.triu(matrix, 1).sum())
@@ -216,9 +234,9 @@ def predict_prematch(feature_vector: dict, requested_models: list[str]) -> dict:
         }
 
     # Corners model
-    if "corners" in requested_models and models.corners:
-        feat_df = _build_feature_df(feature_vector, models.corners.feature_cols)
-        clh, cla = models.corners.predict_lambdas(feat_df)
+    if "corners" in requested_models and m.corners:
+        feat_df = _build_feature_df(feature_vector, m.corners.feature_cols)
+        clh, cla = m.corners.predict_lambdas(feat_df)
         clh, cla = float(clh[0]), float(cla[0])
 
         predictions["corners"] = {
@@ -229,9 +247,9 @@ def predict_prematch(feature_vector: dict, requested_models: list[str]) -> dict:
         }
 
     # Yellows model
-    if "yellows" in requested_models and models.yellows:
-        feat_df = _build_feature_df(feature_vector, models.yellows.feature_cols)
-        ylh, yla = models.yellows.predict_lambdas(feat_df)
+    if "yellows" in requested_models and m.yellows:
+        feat_df = _build_feature_df(feature_vector, m.yellows.feature_cols)
+        ylh, yla = m.yellows.predict_lambdas(feat_df)
         ylh, yla = float(ylh[0]), float(yla[0])
 
         predictions["yellows"] = {
@@ -244,19 +262,20 @@ def predict_prematch(feature_vector: dict, requested_models: list[str]) -> dict:
     return predictions
 
 
-def predict_live(feature_vector: dict, ctx: MatchContext, requested_models: list[str]) -> dict:
-    """Run live (in-play) prediction."""
+def predict_live(feature_vector: dict, ctx: MatchContext, requested_models: list[str], m: Models | None = None) -> dict:
+    """Run live (in-play) prediction using the given model set."""
+    m = m or models
     predictions = {}
 
     minute = ctx.minute or 0
 
     # Goals model — Bayesian live update
-    if "goals" in requested_models and models.goals:
-        feat_df = _build_feature_df(feature_vector, models.goals.feature_cols)
-        lh, la = models.goals.predict_lambdas(feat_df)
+    if "goals" in requested_models and m.goals:
+        feat_df = _build_feature_df(feature_vector, m.goals.feature_cols)
+        lh, la = m.goals.predict_lambdas(feat_df)
         lh, la = float(lh[0]), float(la[0])
 
-        lp = LivePredictor(lh, la, rho=models.goals.rho, max_goals=MAX_GOALS)
+        lp = LivePredictor(lh, la, rho=m.goals.rho, max_goals=MAX_GOALS)
         lp.update(
             minute=minute,
             home_goals=ctx.home_score,
@@ -287,9 +306,9 @@ def predict_live(feature_vector: dict, ctx: MatchContext, requested_models: list
     # Corners — simple time-decay for live
     r = max(0, (90 - minute) / 90)
 
-    if "corners" in requested_models and models.corners:
-        feat_df = _build_feature_df(feature_vector, models.corners.feature_cols)
-        clh, cla = models.corners.predict_lambdas(feat_df)
+    if "corners" in requested_models and m.corners:
+        feat_df = _build_feature_df(feature_vector, m.corners.feature_cols)
+        clh, cla = m.corners.predict_lambdas(feat_df)
         clh, cla = float(clh[0]), float(cla[0])
 
         predictions["corners"] = {
@@ -306,9 +325,9 @@ def predict_live(feature_vector: dict, ctx: MatchContext, requested_models: list
         }
 
     # Yellows — simple time-decay for live
-    if "yellows" in requested_models and models.yellows:
-        feat_df = _build_feature_df(feature_vector, models.yellows.feature_cols)
-        ylh, yla = models.yellows.predict_lambdas(feat_df)
+    if "yellows" in requested_models and m.yellows:
+        feat_df = _build_feature_df(feature_vector, m.yellows.feature_cols)
+        ylh, yla = m.yellows.predict_lambdas(feat_df)
         ylh, yla = float(ylh[0]), float(yla[0])
 
         predictions["yellows"] = {
@@ -364,6 +383,35 @@ async def predict(req: PredictionRequest):
     )
 
 
+@app.post("/backfill", response_model=PredictionResponse, dependencies=[Depends(verify_api_key)])
+async def backfill(req: PredictionRequest):
+    """Backfill prediction endpoint (model trained up to 2026-01-31).
+
+    Same interface as /predict but uses the backfill model set.
+    Only supports prematch predictions.
+    """
+    if backfill_models.goals is None:
+        raise HTTPException(status_code=503, detail="Backfill models not loaded")
+
+    t0 = time.time()
+    predictions = predict_prematch(req.feature_vector, req.models, m=backfill_models)
+    elapsed = round((time.time() - t0) * 1000, 1)
+
+    log.info(
+        f"backfill match_id={req.match_id} "
+        f"models={list(predictions.keys())} elapsed={elapsed}ms"
+    )
+
+    return PredictionResponse(
+        predictions=predictions,
+        model_metadata={
+            "version": backfill_models.version,
+            "prediction_type": "prematch",
+            "elapsed_ms": elapsed,
+        },
+    )
+
+
 @app.get("/model-status")
 async def model_status():
     """Model status check endpoint."""
@@ -375,4 +423,8 @@ async def model_status():
             "yellows": models.yellows is not None,
         },
         "version": models.version,
+        "backfill": {
+            "loaded": backfill_models.goals is not None,
+            "version": backfill_models.version,
+        },
     }
